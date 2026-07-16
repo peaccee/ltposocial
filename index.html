@@ -1,24 +1,270 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Plus, Pencil, Trash2, Link as LinkIcon, Check, Undo2, Loader2 } from "lucide-react";
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>發文進度看板</title>
+<style>
+  :root {
+    --bg: #F1ECE4;
+    --surface: #FFFFFF;
+    --surface-muted: #E9E2D6;
+    --ink: #4A443C;
+    --ink-soft: #8C8171;
+    --border: #DED4C4;
+    --stamp: #9C6B54;
+    --danger: #A65C4D;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+  }
+  .wrap {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 32px 20px 60px;
+  }
+  h1 {
+    font-family: 'Noto Serif TC', 'Songti TC', serif;
+    font-size: 30px;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: 1px;
+  }
+  .subtitle {
+    margin: 6px 0 0;
+    color: var(--ink-soft);
+    font-size: 14px;
+  }
+  .saving { margin-left: 10px; color: var(--stamp); }
+  .error-text { margin: 6px 0 0; color: var(--danger); font-size: 13px; }
 
-/* ---------- 視覺代幣（莫蘭迪色系）---------- */
-const palette = {
-  bg: "#F1ECE4",
-  surface: "#FFFFFF",
-  surfaceMuted: "#E9E2D6",
-  ink: "#4A443C",
-  inkSoft: "#8C8171",
-  border: "#DED4C4",
-  stamp: "#9C6B54",
-};
+  .form-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    margin: 28px 0 32px;
+  }
+  .form-label {
+    font-size: 13px;
+    color: var(--ink-soft);
+    margin-bottom: 10px;
+    font-weight: 600;
+  }
+  textarea, input[type="text"], input[type="url"] {
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 14px;
+    font-family: inherit;
+    background: #FCFBF8;
+    color: var(--ink);
+  }
+  textarea:focus, input:focus {
+    outline: none;
+    border-color: var(--stamp);
+    box-shadow: 0 0 0 3px rgba(156,107,84,0.12);
+  }
+  textarea { resize: vertical; margin-bottom: 10px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .row input:nth-child(1) { flex: 1 1 160px; }
+  .row input:nth-child(2) { flex: 2 1 220px; }
 
+  button {
+    font-family: inherit;
+    cursor: pointer;
+    transition: opacity .15s ease, transform .1s ease;
+  }
+  button:hover { opacity: 0.85; }
+  button:active { transform: scale(0.97); }
+  button:disabled { cursor: not-allowed; opacity: 1; }
+
+  .btn-add {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 18px;
+    font-size: 14px;
+    font-weight: 600;
+    background: var(--stamp);
+    color: #FFF8F3;
+  }
+  .btn-add:disabled { background: var(--border); }
+
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: none;
+    border-radius: 9px;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    background: var(--stamp);
+    color: #FFF8F3;
+    white-space: nowrap;
+  }
+  .btn-danger { background: var(--danger); }
+  .btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    background: transparent;
+    color: var(--ink-soft);
+    white-space: nowrap;
+  }
+  .icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: transparent;
+  }
+  .icon-btn.del { color: var(--danger); }
+  .icon-btn.edit { color: var(--ink-soft); }
+
+  .section-title {
+    font-family: 'Noto Serif TC', 'Songti TC', serif;
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-title .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--stamp); display: inline-block;
+  }
+  .section-title.muted { color: var(--ink-soft); }
+  .section-title.muted .dot { background: var(--ink-soft); }
+
+  .list { display: flex; flex-direction: column; gap: 12px; }
+
+  .empty {
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+    padding: 22px 16px;
+    text-align: center;
+    color: var(--ink-soft);
+    font-size: 13px;
+    background: #FCFBF8;
+  }
+  .empty.muted { background: transparent; }
+
+  .card {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+    overflow: hidden;
+    transition: box-shadow .2s ease, transform .2s ease;
+  }
+  .card:hover { box-shadow: 0 6px 18px rgba(74,68,60,0.08); transform: translateY(-1px); }
+  .card.muted { background: var(--surface-muted); opacity: 0.88; }
+  .card.editing { border-color: var(--stamp); }
+
+  .stamp-badge {
+    position: absolute;
+    top: 10px; right: 14px;
+    transform: rotate(-8deg);
+    border: 2px solid var(--stamp);
+    color: var(--stamp);
+    border-radius: 8px;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    opacity: 0.85;
+    animation: stampIn 0.45s cubic-bezier(.2,.9,.3,1.2);
+  }
+  @keyframes stampIn {
+    0% { transform: scale(2.2) rotate(-18deg); opacity: 0; }
+    60% { transform: scale(0.92) rotate(-8deg); opacity: 1; }
+    100% { transform: scale(1) rotate(-8deg); opacity: 1; }
+  }
+
+  .meta-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+  .tag {
+    font-size: 12px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 999px;
+  }
+  .meta-date { font-size: 12px; color: var(--ink-soft); }
+
+  .content-text {
+    font-size: 15px;
+    line-height: 1.6;
+    margin-bottom: 12px;
+    white-space: pre-wrap;
+  }
+
+  .bottom-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .link-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--stamp);
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .no-link { font-size: 13px; color: var(--ink-soft); }
+
+  .actions { display: flex; align-items: center; gap: 8px; }
+  .confirm-text { font-size: 12px; color: var(--danger); }
+
+  .edit-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+  .loading {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 400px; color: var(--ink-soft); font-size: 14px; gap: 8px;
+  }
+  .spinner {
+    width: 16px; height: 16px; border: 2px solid var(--border);
+    border-top-color: var(--stamp); border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+  <div id="app">
+    <div class="loading"><span class="spinner"></span>載入中…</div>
+  </div>
+
+<script>
+const STORAGE_KEY = "posts";
 const tagColors = [
-  { bg: "#DCC9C6", fg: "#6B4E4B" }, // 霧玫瑰
-  { bg: "#C6CFC0", fg: "#4E5A46" }, // 鼠尾草綠
-  { bg: "#C3CAD2", fg: "#48525B" }, // 霧藍灰
-  { bg: "#D8C7CE", fg: "#5F4A54" }, // 淺莫夫
-  { bg: "#D9CBA6", fg: "#6A5A38" }, // 赭黃
-  { bg: "#C9BFB0", fg: "#54493B" }, // 燕麥灰
+  { bg: "#DCC9C6", fg: "#6B4E4B" },
+  { bg: "#C6CFC0", fg: "#4E5A46" },
+  { bg: "#C3CAD2", fg: "#48525B" },
+  { bg: "#D8C7CE", fg: "#5F4A54" },
+  { bg: "#D9CBA6", fg: "#6A5A38" },
+  { bg: "#C9BFB0", fg: "#54493B" },
 ];
 
 function tagColorFor(name) {
@@ -31,645 +277,240 @@ function tagColorFor(name) {
 function fmtDate(ts) {
   if (!ts) return "";
   const d = new Date(ts);
-  return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(
-    d.getDate()
-  ).padStart(2, "0")}`;
+  return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
 }
 
-const STORAGE_KEY = "posts";
+function escapeHtml(str) {
+  return (str || "").replace(/[&<>"']/g, (m) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
+  }[m]));
+}
 
-export default function App() {
-  const [posts, setPosts] = useState(null); // null = 尚未載入
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+let posts = null;
+let editingId = null;
+let editDraft = { content: "", project: "", link: "" };
+let confirmDeleteId = null;
+let saving = false;
+let errorMsg = "";
+let newPost = { content: "", project: "", link: "" };
+let pollTimer = null;
 
-  const [newPost, setNewPost] = useState({ content: "", project: "", link: "" });
-  const [editingId, setEditingId] = useState(null);
-  const [editDraft, setEditDraft] = useState({ content: "", project: "", link: "" });
-  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+async function load() {
+  try {
+    const res = await window.storage.get(STORAGE_KEY, true);
+    const data = res ? JSON.parse(res.value) : [];
+    const isTypingNew = newPost.content.trim() !== "" || newPost.project.trim() !== "" || newPost.link.trim() !== "";
+    if (editingId !== null || isTypingNew) return;
+    posts = Array.isArray(data) ? data : [];
+    errorMsg = "";
+  } catch (e) {
+    if (posts === null) posts = [];
+  }
+  render();
+}
 
-  const postsRef = useRef(posts);
-  useEffect(() => {
-    postsRef.current = posts;
-  }, [posts]);
+async function persist(next) {
+  posts = next;
+  saving = true;
+  render();
+  try {
+    const ok = await window.storage.set(STORAGE_KEY, JSON.stringify(next), true);
+    errorMsg = ok ? "" : "儲存失敗，請稍後再試一次";
+  } catch (e) {
+    errorMsg = "儲存失敗，請檢查網路後再試一次";
+  } finally {
+    saving = false;
+    render();
+  }
+}
 
-  const isTypingNew =
-    newPost.content.trim() !== "" || newPost.project.trim() !== "" || newPost.link.trim() !== "";
-
-  /* ---------- 讀取資料 ---------- */
-  const load = useCallback(async () => {
-    try {
-      const res = await window.storage.get(STORAGE_KEY, true);
-      const data = res ? JSON.parse(res.value) : [];
-      // 編輯中或正在輸入新項目時，先不要用遠端資料蓋掉畫面
-      if (editingId !== null || isTypingNew) return;
-      setPosts(Array.isArray(data) ? data : []);
-      setError("");
-    } catch (e) {
-      setPosts((prev) => (prev === null ? [] : prev));
-    }
-  }, [editingId, isTypingNew]);
-
-  useEffect(() => {
-    load();
-    const t = setInterval(load, 6000);
-    return () => clearInterval(t);
-  }, [load]);
-
-  const persist = async (next) => {
-    setPosts(next);
-    setSaving(true);
-    try {
-      const ok = await window.storage.set(STORAGE_KEY, JSON.stringify(next), true);
-      if (!ok) setError("儲存失敗，請稍後再試一次");
-      else setError("");
-    } catch (e) {
-      setError("儲存失敗，請檢查網路後再試一次");
-    } finally {
-      setSaving(false);
-    }
+function handleAdd() {
+  const content = document.getElementById("np-content").value;
+  const project = document.getElementById("np-project").value;
+  const link = document.getElementById("np-link").value;
+  if (!content.trim()) return;
+  const item = {
+    id: `p_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    content: content.trim(),
+    project: project.trim(),
+    link: link.trim(),
+    posted: false,
+    createdAt: Date.now(),
+    postedAt: null,
   };
+  const next = [item, ...(posts || [])];
+  newPost = { content: "", project: "", link: "" };
+  persist(next);
+}
 
-  /* ---------- 新增 ---------- */
-  const handleAdd = () => {
-    if (!newPost.content.trim()) return;
-    const item = {
-      id: `p_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-      content: newPost.content.trim(),
-      project: newPost.project.trim(),
-      link: newPost.link.trim(),
-      posted: false,
-      createdAt: Date.now(),
-      postedAt: null,
-    };
-    const next = [item, ...(postsRef.current || [])];
-    persist(next);
-    setNewPost({ content: "", project: "", link: "" });
+function onNewInput() {
+  newPost = {
+    content: document.getElementById("np-content").value,
+    project: document.getElementById("np-project").value,
+    link: document.getElementById("np-link").value,
   };
+  const btn = document.getElementById("np-add-btn");
+  if (btn) btn.disabled = !newPost.content.trim();
+}
 
-  /* ---------- 編輯 ---------- */
-  const startEdit = (p) => {
-    setEditingId(p.id);
-    setEditDraft({ content: p.content, project: p.project, link: p.link });
-  };
-  const cancelEdit = () => {
-    setEditingId(null);
-  };
-  const saveEdit = (id) => {
-    const next = (postsRef.current || []).map((p) =>
-      p.id === id
-        ? { ...p, content: editDraft.content.trim(), project: editDraft.project.trim(), link: editDraft.link.trim() }
-        : p
-    );
-    persist(next);
-    setEditingId(null);
-  };
+function startEdit(id) {
+  const p = posts.find((x) => x.id === id);
+  if (!p) return;
+  editingId = id;
+  editDraft = { content: p.content, project: p.project, link: p.link };
+  confirmDeleteId = null;
+  render();
+}
 
-  /* ---------- 刪除 ---------- */
-  const doDelete = (id) => {
-    const next = (postsRef.current || []).filter((p) => p.id !== id);
-    persist(next);
-    setConfirmDeleteId(null);
-  };
+function cancelEdit() {
+  editingId = null;
+  render();
+}
 
-  /* ---------- 已發文 / 取消發文 ---------- */
-  const markPosted = (id, posted) => {
-    const next = (postsRef.current || []).map((p) =>
-      p.id === id ? { ...p, posted, postedAt: posted ? Date.now() : null } : p
-    );
-    persist(next);
+function onEditInput(id) {
+  editDraft = {
+    content: document.getElementById("ed-content-" + id).value,
+    project: document.getElementById("ed-project-" + id).value,
+    link: document.getElementById("ed-link-" + id).value,
   };
+}
 
-  if (posts === null) {
-    return (
-      <div
-        style={{
-          background: palette.bg,
-          minHeight: "500px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontFamily: "'Noto Sans TC','PingFang TC','Microsoft JhengHei',sans-serif",
-          color: palette.inkSoft,
-        }}
-      >
-        <Loader2 size={20} style={{ marginRight: 8, animation: "spin 1s linear infinite" }} />
-        載入中…
-        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+function saveEdit(id) {
+  const next = posts.map((p) =>
+    p.id === id
+      ? { ...p, content: editDraft.content.trim(), project: editDraft.project.trim(), link: editDraft.link.trim() }
+      : p
+  );
+  editingId = null;
+  persist(next);
+}
+
+function askDelete(id) {
+  confirmDeleteId = confirmDeleteId === id ? null : id;
+  render();
+}
+
+function doDelete(id) {
+  const next = posts.filter((p) => p.id !== id);
+  confirmDeleteId = null;
+  persist(next);
+}
+
+function markPosted(id, postedVal) {
+  const next = posts.map((p) =>
+    p.id === id ? { ...p, posted: postedVal, postedAt: postedVal ? Date.now() : null } : p
+  );
+  persist(next);
+}
+
+function cardHtml(p, muted) {
+  const tag = tagColorFor(p.project);
+
+  if (editingId === p.id) {
+    return `
+      <div class="card editing">
+        <textarea id="ed-content-${p.id}" rows="2" oninput="onEditInput('${p.id}')" style="margin-bottom:10px;">${escapeHtml(editDraft.content)}</textarea>
+        <div class="row">
+          <input id="ed-project-${p.id}" type="text" placeholder="所屬專案" value="${escapeHtml(editDraft.project)}" oninput="onEditInput('${p.id}')" />
+          <input id="ed-link-${p.id}" type="text" placeholder="下載連結" value="${escapeHtml(editDraft.link)}" oninput="onEditInput('${p.id}')" />
+        </div>
+        <div class="edit-actions">
+          <button class="btn-ghost" onclick="cancelEdit()">取消</button>
+          <button class="btn-primary" onclick="saveEdit('${p.id}')">✓ 儲存</button>
+        </div>
       </div>
-    );
+    `;
+  }
+
+  const stampBadge = muted ? `<div class="stamp-badge">已發文</div>` : "";
+  const projectTag = p.project
+    ? `<span class="tag" style="background:${tag.bg};color:${tag.fg};">${escapeHtml(p.project)}</span>`
+    : "";
+  const dateLabel = p.posted ? `發文於 ${fmtDate(p.postedAt)}` : `建立於 ${fmtDate(p.createdAt)}`;
+  const linkHtml = p.link
+    ? `<a class="link-btn" href="${escapeHtml(p.link)}" target="_blank" rel="noreferrer">🔗 下載連結</a>`
+    : `<span class="no-link">尚未提供連結</span>`;
+
+  const actionsHtml = confirmDeleteId === p.id
+    ? `
+      <span class="confirm-text">確定刪除？</span>
+      <button class="btn-ghost" onclick="askDelete('${p.id}')">取消</button>
+      <button class="btn-primary btn-danger" onclick="doDelete('${p.id}')">刪除</button>
+    `
+    : `
+      <button class="icon-btn edit" title="編輯" onclick="startEdit('${p.id}')">✎</button>
+      <button class="icon-btn del" title="刪除" onclick="askDelete('${p.id}')">🗑</button>
+      ${
+        p.posted
+          ? `<button class="btn-ghost" onclick="markPosted('${p.id}', false)">↺ 取消發文</button>`
+          : `<button class="btn-primary" onclick="markPosted('${p.id}', true)">✓ 已發文</button>`
+      }
+    `;
+
+  return `
+    <div class="card ${muted ? "muted" : ""}">
+      ${stampBadge}
+      <div class="meta-row">
+        ${projectTag}
+        <span class="meta-date">${dateLabel}</span>
+      </div>
+      <div class="content-text">${escapeHtml(p.content)}</div>
+      <div class="bottom-row">
+        <div>${linkHtml}</div>
+        <div class="actions">${actionsHtml}</div>
+      </div>
+    </div>
+  `;
+}
+
+function render() {
+  const app = document.getElementById("app");
+  if (posts === null) {
+    app.innerHTML = `<div class="loading"><span class="spinner"></span>載入中…</div>`;
+    return;
   }
 
   const pending = posts.filter((p) => !p.posted).sort((a, b) => b.createdAt - a.createdAt);
   const posted = posts.filter((p) => p.posted).sort((a, b) => (b.postedAt || 0) - (a.postedAt || 0));
 
-  return (
-    <div
-      style={{
-        background: palette.bg,
-        minHeight: "600px",
-        fontFamily: "'Noto Sans TC','PingFang TC','Microsoft JhengHei',sans-serif",
-        color: palette.ink,
-        padding: "32px 20px 60px",
-      }}
-    >
-      <style>{`
-        @keyframes stampIn {
-          0% { transform: scale(2.2) rotate(-18deg); opacity: 0; }
-          60% { transform: scale(0.92) rotate(-8deg); opacity: 1; }
-          100% { transform: scale(1) rotate(-8deg); opacity: 1; }
-        }
-        .stamp-badge { animation: stampIn 0.45s cubic-bezier(.2,.9,.3,1.2); }
-        .fp-input:focus, .fp-textarea:focus {
-          outline: none;
-          border-color: ${palette.stamp} !important;
-          box-shadow: 0 0 0 3px rgba(156,107,84,0.12);
-        }
-        .fp-card { transition: box-shadow .2s ease, transform .2s ease; }
-        .fp-card:hover { box-shadow: 0 6px 18px rgba(74,68,60,0.08); transform: translateY(-1px); }
-        .fp-btn { transition: opacity .15s ease, transform .1s ease; }
-        .fp-btn:active { transform: scale(0.97); }
-        .fp-btn:hover { opacity: 0.85; }
-      `}</style>
+  app.innerHTML = `
+    <div class="wrap">
+      <h1>發文進度看板</h1>
+      <p class="subtitle">
+        待發文 ${pending.length} 篇・已發文 ${posted.length} 篇
+        ${saving ? `<span class="saving">儲存中…</span>` : ""}
+      </p>
+      ${errorMsg ? `<p class="error-text">${escapeHtml(errorMsg)}</p>` : ""}
 
-      <div style={{ maxWidth: 760, margin: "0 auto" }}>
-        {/* 標題 */}
-        <div style={{ marginBottom: 28 }}>
-          <h1
-            style={{
-              fontFamily: "'Noto Serif TC','Songti TC',serif",
-              fontSize: 30,
-              fontWeight: 700,
-              margin: 0,
-              letterSpacing: 1,
-              color: palette.ink,
-            }}
-          >
-            發文進度看板
-          </h1>
-          <p style={{ margin: "6px 0 0", color: palette.inkSoft, fontSize: 14 }}>
-            待發文 {pending.length} 篇・已發文 {posted.length} 篇
-            {saving && <span style={{ marginLeft: 10, color: palette.stamp }}>儲存中…</span>}
-          </p>
-          {error && (
-            <p style={{ margin: "6px 0 0", color: "#A65C4D", fontSize: 13 }}>{error}</p>
-          )}
+      <div class="form-card">
+        <div class="form-label">新增影片</div>
+        <textarea id="np-content" rows="2" placeholder="影片內容（例：7月產品開箱短影音）" oninput="onNewInput()">${escapeHtml(newPost.content)}</textarea>
+        <div class="row">
+          <input id="np-project" type="text" placeholder="所屬專案" value="${escapeHtml(newPost.project)}" oninput="onNewInput()" />
+          <input id="np-link" type="text" placeholder="影片下載連結（https://...）" value="${escapeHtml(newPost.link)}" oninput="onNewInput()" />
         </div>
+        <button id="np-add-btn" class="btn-add" onclick="handleAdd()" ${!newPost.content.trim() ? "disabled" : ""}>＋ 新增到待發文</button>
+      </div>
 
-        {/* 新增表單 */}
-        <div
-          style={{
-            background: palette.surface,
-            border: `1px solid ${palette.border}`,
-            borderRadius: 14,
-            padding: 20,
-            marginBottom: 32,
-          }}
-        >
-          <div style={{ fontSize: 13, color: palette.inkSoft, marginBottom: 10, fontWeight: 600 }}>
-            新增影片
-          </div>
-          <textarea
-            className="fp-textarea"
-            placeholder="影片內容（例：7月產品開箱短影音）"
-            value={newPost.content}
-            onChange={(e) => setNewPost((s) => ({ ...s, content: e.target.value }))}
-            rows={2}
-            style={{
-              width: "100%",
-              boxSizing: "border-box",
-              border: `1px solid ${palette.border}`,
-              borderRadius: 10,
-              padding: "10px 12px",
-              fontSize: 14,
-              fontFamily: "inherit",
-              resize: "vertical",
-              marginBottom: 10,
-              color: palette.ink,
-              background: "#FCFBF8",
-            }}
-          />
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
-            <input
-              className="fp-input"
-              placeholder="所屬專案"
-              value={newPost.project}
-              onChange={(e) => setNewPost((s) => ({ ...s, project: e.target.value }))}
-              style={{
-                flex: "1 1 160px",
-                border: `1px solid ${palette.border}`,
-                borderRadius: 10,
-                padding: "10px 12px",
-                fontSize: 14,
-                background: "#FCFBF8",
-                color: palette.ink,
-              }}
-            />
-            <input
-              className="fp-input"
-              placeholder="影片下載連結（https://...）"
-              value={newPost.link}
-              onChange={(e) => setNewPost((s) => ({ ...s, link: e.target.value }))}
-              style={{
-                flex: "2 1 220px",
-                border: `1px solid ${palette.border}`,
-                borderRadius: 10,
-                padding: "10px 12px",
-                fontSize: 14,
-                background: "#FCFBF8",
-                color: palette.ink,
-              }}
-            />
-          </div>
-          <button
-            className="fp-btn"
-            onClick={handleAdd}
-            disabled={!newPost.content.trim()}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              border: "none",
-              borderRadius: 10,
-              padding: "10px 18px",
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: newPost.content.trim() ? "pointer" : "not-allowed",
-              background: newPost.content.trim() ? palette.stamp : palette.border,
-              color: "#FFF8F3",
-            }}
-          >
-            <Plus size={16} /> 新增到待發文
-          </button>
+      <div>
+        <div class="section-title"><span class="dot"></span>待發文</div>
+        <div class="list">
+          ${pending.length === 0 ? `<div class="empty">目前沒有待發文的影片</div>` : pending.map((p) => cardHtml(p, false)).join("")}
         </div>
+      </div>
 
-        {/* 待發文區 */}
-        <Section title="待發文">
-          {pending.length === 0 && <Empty text="目前沒有待發文的影片" />}
-          {pending.map((p) => (
-            <Card
-              key={p.id}
-              post={p}
-              editing={editingId === p.id}
-              editDraft={editDraft}
-              setEditDraft={setEditDraft}
-              onEdit={() => startEdit(p)}
-              onCancelEdit={cancelEdit}
-              onSaveEdit={() => saveEdit(p.id)}
-              onDelete={() =>
-                setConfirmDeleteId(confirmDeleteId === p.id ? null : p.id)
-              }
-              confirmDelete={confirmDeleteId === p.id}
-              onConfirmDelete={() => doDelete(p.id)}
-              onCancelDelete={() => setConfirmDeleteId(null)}
-              primaryAction={
-                <button
-                  className="fp-btn"
-                  onClick={() => markPosted(p.id, true)}
-                  style={btnPrimary}
-                >
-                  <Check size={15} /> 已發文
-                </button>
-              }
-            />
-          ))}
-        </Section>
-
-        {/* 已發文區 */}
-        <div style={{ marginTop: 36 }}>
-          <Section title="已發文" muted>
-            {posted.length === 0 && <Empty text="還沒有已發文的項目" muted />}
-            {posted.map((p) => (
-              <Card
-                key={p.id}
-                post={p}
-                muted
-                editing={editingId === p.id}
-                editDraft={editDraft}
-                setEditDraft={setEditDraft}
-                onEdit={() => startEdit(p)}
-                onCancelEdit={cancelEdit}
-                onSaveEdit={() => saveEdit(p.id)}
-                onDelete={() =>
-                  setConfirmDeleteId(confirmDeleteId === p.id ? null : p.id)
-                }
-                confirmDelete={confirmDeleteId === p.id}
-                onConfirmDelete={() => doDelete(p.id)}
-                onCancelDelete={() => setConfirmDeleteId(null)}
-                primaryAction={
-                  <button
-                    className="fp-btn"
-                    onClick={() => markPosted(p.id, false)}
-                    style={btnGhost}
-                  >
-                    <Undo2 size={14} /> 取消發文
-                  </button>
-                }
-              />
-            ))}
-          </Section>
+      <div style="margin-top:36px;">
+        <div class="section-title muted"><span class="dot"></span>已發文</div>
+        <div class="list">
+          ${posted.length === 0 ? `<div class="empty muted">還沒有已發文的項目</div>` : posted.map((p) => cardHtml(p, true)).join("")}
         </div>
       </div>
     </div>
-  );
+  `;
 }
 
-/* ---------- 子元件 ---------- */
-
-function Section({ title, children, muted }) {
-  return (
-    <div>
-      <div
-        style={{
-          fontFamily: "'Noto Serif TC','Songti TC',serif",
-          fontSize: 16,
-          fontWeight: 700,
-          color: muted ? palette.inkSoft : palette.ink,
-          marginBottom: 12,
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-        }}
-      >
-        <span
-          style={{
-            width: 6,
-            height: 6,
-            borderRadius: "50%",
-            background: muted ? palette.inkSoft : palette.stamp,
-            display: "inline-block",
-          }}
-        />
-        {title}
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>{children}</div>
-    </div>
-  );
-}
-
-function Empty({ text, muted }) {
-  return (
-    <div
-      style={{
-        border: `1px dashed ${palette.border}`,
-        borderRadius: 12,
-        padding: "22px 16px",
-        textAlign: "center",
-        color: palette.inkSoft,
-        fontSize: 13,
-        background: muted ? "transparent" : "#FCFBF8",
-      }}
-    >
-      {text}
-    </div>
-  );
-}
-
-const btnPrimary = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 6,
-  border: "none",
-  borderRadius: 9,
-  padding: "8px 14px",
-  fontSize: 13,
-  fontWeight: 600,
-  cursor: "pointer",
-  background: palette.stamp,
-  color: "#FFF8F3",
-  whiteSpace: "nowrap",
-};
-
-const btnGhost = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 6,
-  border: `1px solid ${palette.border}`,
-  borderRadius: 9,
-  padding: "8px 14px",
-  fontSize: 13,
-  fontWeight: 600,
-  cursor: "pointer",
-  background: "transparent",
-  color: palette.inkSoft,
-  whiteSpace: "nowrap",
-};
-
-const iconBtn = (color) => ({
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  width: 32,
-  height: 32,
-  borderRadius: 8,
-  border: `1px solid ${palette.border}`,
-  background: "transparent",
-  color,
-  cursor: "pointer",
-});
-
-function Card({
-  post,
-  muted,
-  editing,
-  editDraft,
-  setEditDraft,
-  onEdit,
-  onCancelEdit,
-  onSaveEdit,
-  onDelete,
-  confirmDelete,
-  onConfirmDelete,
-  onCancelDelete,
-  primaryAction,
-}) {
-  const tag = tagColorFor(post.project);
-
-  if (editing) {
-    return (
-      <div
-        className="fp-card"
-        style={{
-          background: palette.surface,
-          border: `1px solid ${palette.stamp}`,
-          borderRadius: 14,
-          padding: 16,
-        }}
-      >
-        <textarea
-          className="fp-textarea"
-          value={editDraft.content}
-          onChange={(e) => setEditDraft((s) => ({ ...s, content: e.target.value }))}
-          rows={2}
-          style={{
-            width: "100%",
-            boxSizing: "border-box",
-            border: `1px solid ${palette.border}`,
-            borderRadius: 10,
-            padding: "10px 12px",
-            fontSize: 14,
-            fontFamily: "inherit",
-            resize: "vertical",
-            marginBottom: 10,
-            background: "#FCFBF8",
-            color: palette.ink,
-          }}
-        />
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
-          <input
-            className="fp-input"
-            value={editDraft.project}
-            onChange={(e) => setEditDraft((s) => ({ ...s, project: e.target.value }))}
-            placeholder="所屬專案"
-            style={{
-              flex: "1 1 140px",
-              border: `1px solid ${palette.border}`,
-              borderRadius: 10,
-              padding: "8px 10px",
-              fontSize: 13,
-              background: "#FCFBF8",
-              color: palette.ink,
-            }}
-          />
-          <input
-            className="fp-input"
-            value={editDraft.link}
-            onChange={(e) => setEditDraft((s) => ({ ...s, link: e.target.value }))}
-            placeholder="下載連結"
-            style={{
-              flex: "2 1 200px",
-              border: `1px solid ${palette.border}`,
-              borderRadius: 10,
-              padding: "8px 10px",
-              fontSize: 13,
-              background: "#FCFBF8",
-              color: palette.ink,
-            }}
-          />
-        </div>
-        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-          <button className="fp-btn" onClick={onCancelEdit} style={btnGhost}>
-            取消
-          </button>
-          <button className="fp-btn" onClick={onSaveEdit} style={btnPrimary}>
-            <Check size={14} /> 儲存
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className="fp-card"
-      style={{
-        position: "relative",
-        background: muted ? palette.surfaceMuted : palette.surface,
-        border: `1px solid ${palette.border}`,
-        borderRadius: 14,
-        padding: 16,
-        opacity: muted ? 0.88 : 1,
-        overflow: "hidden",
-      }}
-    >
-      {muted && (
-        <div
-          className="stamp-badge"
-          style={{
-            position: "absolute",
-            top: 10,
-            right: 14,
-            transform: "rotate(-8deg)",
-            border: `2px solid ${palette.stamp}`,
-            color: palette.stamp,
-            borderRadius: 8,
-            padding: "2px 8px",
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: 2,
-            opacity: 0.85,
-          }}
-        >
-          已發文
-        </div>
-      )}
-
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-        {post.project && (
-          <span
-            style={{
-              background: tag.bg,
-              color: tag.fg,
-              fontSize: 12,
-              fontWeight: 700,
-              padding: "3px 10px",
-              borderRadius: 999,
-            }}
-          >
-            {post.project}
-          </span>
-        )}
-        <span style={{ fontSize: 12, color: palette.inkSoft }}>
-          {post.posted ? `發文於 ${fmtDate(post.postedAt)}` : `建立於 ${fmtDate(post.createdAt)}`}
-        </span>
-      </div>
-
-      <div style={{ fontSize: 15, lineHeight: 1.6, marginBottom: 12, whiteSpace: "pre-wrap" }}>
-        {post.content}
-      </div>
-
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-        <div>
-          {post.link ? (
-            <a
-              href={post.link}
-              target="_blank"
-              rel="noreferrer"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                fontSize: 13,
-                color: palette.stamp,
-                textDecoration: "none",
-                fontWeight: 600,
-              }}
-            >
-              <LinkIcon size={14} /> 下載連結
-            </a>
-          ) : (
-            <span style={{ fontSize: 13, color: palette.inkSoft }}>尚未提供連結</span>
-          )}
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {!confirmDelete ? (
-            <>
-              <button className="fp-btn" onClick={onEdit} style={iconBtn(palette.inkSoft)} title="編輯">
-                <Pencil size={14} />
-              </button>
-              <button className="fp-btn" onClick={onDelete} style={iconBtn("#A65C4D")} title="刪除">
-                <Trash2 size={14} />
-              </button>
-              {primaryAction}
-            </>
-          ) : (
-            <>
-              <span style={{ fontSize: 12, color: "#A65C4D" }}>確定刪除？</span>
-              <button className="fp-btn" onClick={onCancelDelete} style={btnGhost}>
-                取消
-              </button>
-              <button
-                className="fp-btn"
-                onClick={onConfirmDelete}
-                style={{ ...btnPrimary, background: "#A65C4D" }}
-              >
-                刪除
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
+load();
+pollTimer = setInterval(load, 6000);
+</script>
+</body>
+</html>
